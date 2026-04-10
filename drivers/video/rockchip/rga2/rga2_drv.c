@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 ROCKCHIP, Inc.
+ * Copyright (C) 2012 Rockchip Electronics Co., Ltd.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -28,7 +28,7 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/fs.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
@@ -45,7 +45,11 @@
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0))
 #include <linux/pm_runtime.h>
+#ifdef CONFIG_DMABUF_CACHE
+#include <linux/dma-buf-cache.h>
+#else
 #include <linux/dma-buf.h>
+#endif
 #endif
 
 #include "rga2.h"
@@ -76,7 +80,6 @@
 #define RGA2_PHY_PAGE_SIZE	(((8192 * 8192 * 4) / 4096) + 1)
 
 ktime_t rga2_start;
-ktime_t rga2_end;
 int rga2_flag;
 int first_RGA2_proc;
 static int rk3368;
@@ -1179,9 +1182,11 @@ retry:
 
 #ifdef CONFIG_ROCKCHIP_RGA2_DEBUGGER
 	if (RGA2_TEST_TIME) {
-		rga2_end = ktime_get();
-		rga2_end = ktime_sub(rga2_end, rga2_start);
-		DBG("sync one cmd end time %d\n", (int)ktime_to_us(rga2_end));
+		ktime_t rga2_cmd_end;
+
+		rga2_cmd_end = ktime_get();
+		rga2_cmd_end = ktime_sub(rga2_cmd_end, rga2_start);
+		DBG("sync one cmd end time %d us\n", (int)ktime_to_us(rga2_cmd_end));
 	}
 #endif
 	if (ret == -ETIMEDOUT && try--) {
@@ -1657,6 +1662,14 @@ static irqreturn_t rga2_irq_thread(int irq, void *dev_id)
 	if (RGA2_INT_FLAG)
 		INFO("irqthread INT[%x],STATS[%x]\n", rga2_read(RGA2_INT),
 		     rga2_read(RGA2_STATUS));
+
+	if (RGA2_TEST_TIME) {
+		ktime_t rga2_hw_end;
+
+		rga2_hw_end = ktime_get();
+		rga2_hw_end = ktime_sub(rga2_hw_end, rga2_start);
+		DBG("RGA hardware cost time %d us\n", (int)ktime_to_us(rga2_hw_end));
+	}
 #endif
 	RGA2_flush_page();
 	mutex_lock(&rga2_service.lock);

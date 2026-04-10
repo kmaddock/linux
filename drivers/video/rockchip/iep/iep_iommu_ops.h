@@ -17,7 +17,6 @@
 #define __IEP_IOMMU_OPS_H__
 
 #include <linux/platform_device.h>
-#include <linux/rockchip-iovmm.h>
 #include "iep_drv.h"
 
 #define BUFFER_LIST_MAX_NUMS	30
@@ -88,9 +87,6 @@ struct iep_iommu_info {
 
 #ifdef CONFIG_DRM
 void iep_iommu_drm_set_ops(struct iep_iommu_info *iommu_info);
-#endif
-#ifdef CONFIG_ION
-void iep_iommu_ion_set_ops(struct iep_iommu_info *iommu_info);
 #endif
 
 struct iep_iommu_info *iep_iommu_info_create(struct device *dev,

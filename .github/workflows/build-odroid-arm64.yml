@@ -101,7 +101,7 @@ jobs:
 
       - name: Build Debian packages
         run: |
-          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}" deb-pkg
+          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

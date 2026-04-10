@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 ROCKCHIP, Inc.
+ * Copyright (C) 2013 Rockchip Electronics Co., Ltd.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -24,7 +24,6 @@
 #include <linux/poll.h>
 #include <linux/dma-mapping.h>
 #include <linux/fb.h>
-#include <linux/rk_fb.h>
 #include <linux/wakelock.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -32,6 +31,7 @@
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
 #include <linux/rockchip/cpu.h>
+#include <linux/iommu.h>
 #include <asm/cacheflush.h>
 #include "iep_drv.h"
 #include "hw_iep_reg.h"
@@ -579,8 +579,7 @@ static void iep_service_session_clear(iep_session *session)
 static int iep_open(struct inode *inode, struct file *filp)
 {
 	//DECLARE_WAITQUEUE(wait, current);
-	iep_session *session = (iep_session *)kzalloc(sizeof(iep_session),
-		GFP_KERNEL);
+	iep_session *session = kzalloc(sizeof(*session), GFP_KERNEL);
 	if (NULL == session) {
 		IEP_ERR("unable to allocate memory for iep_session.\n");
 		return -ENOMEM;
@@ -660,7 +659,6 @@ static int iep_get_result_sync(iep_session *session)
 	if (unlikely(ret < 0)) {
 		IEP_ERR("sync pid %d wait task ret %d\n", session->pid, ret);
 		iep_del_running_list();
-		ret = ret;
 	} else if (0 == ret) {
 		IEP_ERR("sync pid %d wait %d task done timeout\n",
 			session->pid, atomic_read(&session->task_running));
@@ -696,8 +694,7 @@ static long iep_ioctl(struct file *filp, uint32_t cmd, unsigned long arg)
 	case IEP_SET_PARAMETER:
 		{
 			struct IEP_MSG *msg;
-			msg = (struct IEP_MSG *)kzalloc(sizeof(struct IEP_MSG),
-				GFP_KERNEL);
+			msg = kzalloc(sizeof(*msg), GFP_KERNEL);
 			if (msg) {
 				if (copy_from_user(msg, (struct IEP_MSG *)arg,
 						sizeof(struct IEP_MSG))) {
@@ -874,54 +871,16 @@ static struct miscdevice iep_dev = {
 	.fops  = &iep_fops,
 };
 
-static struct device* rockchip_get_sysmmu_device_by_compatible(
-	const char *compt)
-{
-	struct device_node *dn = NULL;
-	struct platform_device *pd = NULL;
-	struct device *ret = NULL;
-
-	dn = of_find_compatible_node(NULL, NULL, compt);
-	if (!dn) {
-		printk("can't find device node %s \r\n", compt);
-		return NULL;
-	}
-
-	pd = of_find_device_by_node(dn);
-	if (!pd) {
-		printk("can't find platform device in device node %s \r\n",
-			compt);
-		return  NULL;
-	}
-	ret = &pd->dev;
-
-	return ret;
-
-}
-#ifdef CONFIG_IOMMU_API
-static inline void platform_set_sysmmu(struct device *iommu,
-	struct device *dev)
-{
-	dev->archdata.iommu = iommu;
-}
-#else
-static inline void platform_set_sysmmu(struct device *iommu,
-	struct device *dev)
-{
-}
-#endif
-
-static int iep_sysmmu_fault_handler(struct device *dev,
-	enum rk_iommu_inttype itype,
-	unsigned long pgtable_base,
-	unsigned long fault_addr, unsigned int status)
+static int iep_sysmmu_fault_handler(struct iommu_domain *domain,
+				    struct device *iommu_dev,
+				    unsigned long iova, int status, void *arg)
 {
 	struct iep_reg *reg = list_entry(iep_service.running.next,
 		struct iep_reg, status_link);
 	if (reg != NULL) {
 		struct iep_mem_region *mem, *n;
 		int i = 0;
-		pr_info("iep, fault addr 0x%08x\n", (u32)fault_addr);
+		pr_info("iep, fault addr 0x%08x\n", (u32)iova);
 		list_for_each_entry_safe(mem, n,
 			&reg->mem_region_list,
 			reg_lnk) {
@@ -948,11 +907,12 @@ static int iep_drv_probe(struct platform_device *pdev)
 	struct platform_device *sub_dev = NULL;
 	struct device_node *sub_np = NULL;
 	u32 iommu_en = 0;
-	struct device *mmu_dev = NULL;
+	struct iommu_domain *domain;
+
 	of_property_read_u32(np, "iommu_enabled", &iommu_en);
 
-	data = (struct iep_drvdata *)devm_kzalloc(&pdev->dev,
-		sizeof(struct iep_drvdata), GFP_KERNEL);
+	data = devm_kzalloc(&pdev->dev, sizeof(*data),
+			    GFP_KERNEL);
 	if (NULL == data) {
 		IEP_ERR("failed to allocate driver data.\n");
 		return  -ENOMEM;
@@ -1085,21 +1045,10 @@ static int iep_drv_probe(struct platform_device *pdev)
 	if (sub_np) {
 		sub_dev = of_find_device_by_node(sub_np);
 		iep_service.iommu_dev = &sub_dev->dev;
+		domain = iommu_get_domain_for_dev(&pdev->dev);
+		iommu_set_fault_handler(domain, iep_sysmmu_fault_handler, data);
 	}
 
-	if (!iep_service.iommu_dev) {
-		mmu_dev = rockchip_get_sysmmu_device_by_compatible(
-			IEP_IOMMU_COMPATIBLE_NAME);
-
-		if (mmu_dev) {
-			platform_set_sysmmu(mmu_dev, &pdev->dev);
-		}
-
-		rockchip_iovmm_set_fault_handler(&pdev->dev,
-						 iep_sysmmu_fault_handler);
-
-		iep_service.iommu_dev = mmu_dev;
-	}
 	of_property_read_u32(np, "allocator", (u32 *)&iep_service.alloc_type);
 	iep_power_on();
 	iep_service.iommu_info = iep_iommu_info_create(data->dev,
@@ -1114,12 +1063,6 @@ static int iep_drv_probe(struct platform_device *pdev)
 err_misc_register:
 	free_irq(data->irq0, pdev);
 err_irq:
-	if (res) {
-		if (data->iep_base) {
-			devm_ioremap_release(&pdev->dev, res);
-		}
-		devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
-	}
 err_ioremap:
 	wake_lock_destroy(&data->wake_lock);
 #ifdef IEP_CLK_ENABLE
@@ -1131,7 +1074,6 @@ err_clock:
 static int iep_drv_remove(struct platform_device *pdev)
 {
 	struct iep_drvdata *data = platform_get_drvdata(pdev);
-	struct resource *res;
 
 	iep_iommu_info_destroy(iep_service.iommu_info);
 	iep_service.iommu_info = NULL;
@@ -1140,20 +1082,8 @@ static int iep_drv_remove(struct platform_device *pdev)
 
 	misc_deregister(&(data->miscdev));
 	free_irq(data->irq0, &data->miscdev);
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	devm_ioremap_release(&pdev->dev, res);
-	devm_release_mem_region(&pdev->dev, res->start, resource_size(res));
 
 #ifdef IEP_CLK_ENABLE
-	if (data->aclk_iep)
-		devm_clk_put(&pdev->dev, data->aclk_iep);
-
-	if (data->hclk_iep)
-		devm_clk_put(&pdev->dev, data->hclk_iep);
-
-	if (data->pd_iep)
-		devm_clk_put(&pdev->dev, data->pd_iep);
-
 	pm_runtime_disable(data->dev);
 #endif
 
@@ -1171,7 +1101,6 @@ static struct platform_driver iep_driver = {
 	.probe		= iep_drv_probe,
 	.remove		= iep_drv_remove,
 	.driver		= {
-		.owner  = THIS_MODULE,
 		.name	= "iep",
 #if defined(CONFIG_OF)
 		.of_match_table = of_match_ptr(iep_dt_ids),
@@ -1218,11 +1147,11 @@ static int proc_iep_open(struct inode *inode, struct file *file)
 	return single_open(file, proc_iep_show, NULL);
 }
 
-static const struct file_operations proc_iep_fops = {
-	.open		= proc_iep_open,
-	.read		= seq_read,
-	.llseek 	= seq_lseek,
-	.release	= single_release,
+static const struct proc_ops proc_iep_fops = {
+	.proc_open	= proc_iep_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
 };
 
 static int __init iep_proc_init(void)
@@ -1281,8 +1210,13 @@ module_exit(iep_exit);
 MODULE_AUTHOR("ljf@rock-chips.com");
 MODULE_DESCRIPTION("Driver for iep device");
 MODULE_LICENSE("GPL");
+MODULE_IMPORT_NS(DMA_BUF);
 
 #ifdef IEP_TEST_CASE
+
+/*this test just test for iep , not test iep's iommu
+ *so dts need cancel iommus handle
+ */
 
 #include "yuv420sp_480x480_interlaced.h"
 #include "yuv420sp_480x480_deinterlaced_i2o1.h"
@@ -1293,7 +1227,7 @@ void iep_test_case0(void)
 {
 	struct IEP_MSG msg;
 	iep_session session;
-	unsigned int phy_src, phy_dst, phy_tmp;
+	unsigned int phy_src, phy_tmp;
 	int i;
 	int ret = 0;
 	unsigned char *tmp_buf;
@@ -1313,15 +1247,21 @@ void iep_test_case0(void)
 	memset(&msg, 0, sizeof(struct IEP_MSG));
 	memset(tmp_buf, 0xCC, 480 * 480 * 3 / 2);
 
+#ifdef CONFIG_ARM
+	dmac_flush_range(&yuv420sp_480x480_interlaced[0],
+			 &yuv420sp_480x480_interlaced[480 * 480 * 3 / 2]);
+	outer_flush_range(virt_to_phys(&yuv420sp_480x480_interlaced[0]),
+		virt_to_phys(&yuv420sp_480x480_interlaced[480 * 480 * 3 / 2]));
+
 	dmac_flush_range(&tmp_buf[0], &tmp_buf[480 * 480 * 3 / 2]);
 	outer_flush_range(virt_to_phys(&tmp_buf[0]), virt_to_phys(&tmp_buf[480 * 480 * 3 / 2]));
+#elif defined(CONFIG_ARM64)
+	__dma_flush_area(&yuv420sp_480x480_interlaced[0], 480 * 480 * 3 / 2);
+	__dma_flush_area(&tmp_buf[0], 480 * 480 * 3 / 2);
+#endif
 
 	phy_src = virt_to_phys(&yuv420sp_480x480_interlaced[0]);
 	phy_tmp = virt_to_phys(&tmp_buf[0]);
-	phy_dst = virt_to_phys(&yuv420sp_480x480_deinterlaced_i2o1[0]);
-
-	dmac_flush_range(&yuv420sp_480x480_interlaced[0], &yuv420sp_480x480_interlaced[480 * 480 * 3 / 2]);
-	outer_flush_range(virt_to_phys(&yuv420sp_480x480_interlaced[0]), virt_to_phys(&yuv420sp_480x480_interlaced[480 * 480 * 3 / 2]));
 
 	IEP_INFO("*********** IEP MSG GENARATE ************\n");
 
@@ -1332,8 +1272,8 @@ void iep_test_case0(void)
 	msg.src.vir_w = 480;
 	msg.src.vir_h = 480;
 	msg.src.format = IEP_FORMAT_YCbCr_420_SP;
-	msg.src.mem_addr = (uint32_t *)phy_src;
-	msg.src.uv_addr  = (uint32_t *)(phy_src + 480 * 480);
+	msg.src.mem_addr = phy_src;
+	msg.src.uv_addr  = (phy_src + 480 * 480);
 	msg.src.v_addr = 0;
 
 	msg.dst.act_w = 480;
@@ -1343,8 +1283,8 @@ void iep_test_case0(void)
 	msg.dst.vir_w = 480;
 	msg.dst.vir_h = 480;
 	msg.dst.format = IEP_FORMAT_YCbCr_420_SP;
-	msg.dst.mem_addr = (uint32_t *)phy_tmp;
-	msg.dst.uv_addr = (uint32_t *)(phy_tmp + 480 * 480);
+	msg.dst.mem_addr = phy_tmp;
+	msg.dst.uv_addr = (phy_tmp + 480 * 480);
 	msg.dst.v_addr = 0;
 
 	msg.dein_mode = IEP_DEINTERLACE_MODE_I2O1;
@@ -1360,9 +1300,6 @@ void iep_test_case0(void)
 	}
 
 	mdelay(10);
-
-	dmac_flush_range(&tmp_buf[0], &tmp_buf[480 * 480 * 3 / 2]);
-	outer_flush_range(virt_to_phys(&tmp_buf[0]), virt_to_phys(&tmp_buf[480 * 480 * 3 / 2]));
 
 	IEP_INFO("*********** RESULT CHECKING  ************\n");
 

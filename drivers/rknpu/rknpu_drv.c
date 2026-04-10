@@ -770,7 +770,6 @@ static struct drm_driver rknpu_drm_driver = {
 	.fops = &rknpu_drm_driver_fops,
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
-	.date = DRIVER_DATE,
 	.major = DRIVER_MAJOR,
 	.minor = DRIVER_MINOR,
 	.patchlevel = DRIVER_PATCHLEVEL,
@@ -1561,7 +1560,7 @@ err_remove_drv:
 	return ret;
 }
 
-static int rknpu_remove(struct platform_device *pdev)
+static void rknpu_remove(struct platform_device *pdev)
 {
 	struct rknpu_device *rknpu_dev = platform_get_drvdata(pdev);
 	int i = 0;
@@ -1621,8 +1620,6 @@ static int rknpu_remove(struct platform_device *pdev)
 	}
 
 	pm_runtime_disable(&pdev->dev);
-
-	return 0;
 }
 
 #ifndef FPGA_PLATFORM
@@ -1695,5 +1692,5 @@ MODULE_LICENSE("GPL v2");
 MODULE_VERSION(RKNPU_GET_DRV_VERSION_STRING(DRIVER_MAJOR, DRIVER_MINOR,
 					    DRIVER_PATCHLEVEL));
 #if KERNEL_VERSION(5, 16, 0) < LINUX_VERSION_CODE
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 #endif

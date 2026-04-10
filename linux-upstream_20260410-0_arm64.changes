@@ -1,0 +1,34 @@
+Format: 1.8
+Date: Fri, 10 Apr 2026 11:43:11 +0000
+Source: linux-upstream
+Binary: linux-headers-6.14.0+ linux-image-6.14.0+ linux-libc-dev
+Built-For-Profiles: noudeb
+Architecture: arm64
+Version: 20260410-0
+Distribution: questing
+Urgency: low
+Maintainer: kester <kester@ubuntu>
+Changed-By: kester <kester@ubuntu>
+Description:
+ linux-headers-6.14.0+ - Linux kernel headers for 6.14.0+ on arm64
+ linux-image-6.14.0+ - Linux kernel, version 6.14.0+
+ linux-libc-dev - Linux support headers for userspace development
+Changes:
+ linux-upstream (20260410-0) questing; urgency=low
+ .
+   * Custom built Linux kernel.
+Checksums-Sha1:
+ 0403a1ba32df03f59294c5fe18246e78a4cf42f2 8834530 linux-headers-6.14.0+_20260410-0_arm64.deb
+ 85a9f484c4c82a7fc444e163bea40803386bcc03 36407804 linux-image-6.14.0+_20260410-0_arm64.deb
+ 4615f20b28af0685d59a5c69afe59aff06ee75a7 1434370 linux-libc-dev_20260410-0_arm64.deb
+ 42c2b7c6fc3b7e4e386033fbf6783ced3431b7d6 7318 linux-upstream_20260410-0_arm64.buildinfo
+Checksums-Sha256:
+ a93664885fe4988084862d160eed7074e96bb7d0b0aa4a8968f3f05efdbe4688 8834530 linux-headers-6.14.0+_20260410-0_arm64.deb
+ b2053327596db368d107882db34c8c9272702d63302ceea0484f9f7fe7f6090b 36407804 linux-image-6.14.0+_20260410-0_arm64.deb
+ 696d6be8acbe99fffc64e851e7e7e62f65800413a9909fd8b6101c0ac50e13da 1434370 linux-libc-dev_20260410-0_arm64.deb
+ 337ad0326841b95b8ae141538d4901eede400aacdedeb5b85cbf1eca5e2c211c 7318 linux-upstream_20260410-0_arm64.buildinfo
+Files:
+ c12f31181f33ffa36f7152d3b4453119 8834530 kernel optional linux-headers-6.14.0+_20260410-0_arm64.deb
+ bfb08f5cb8b82e5ba8031ee5f3de9934 36407804 kernel optional linux-image-6.14.0+_20260410-0_arm64.deb
+ a10309936efecea2fcbdd1e3e095f666 1434370 devel optional linux-libc-dev_20260410-0_arm64.deb
+ d45d97aea15df1782e3d4d0eaedd2650 7318 kernel optional linux-upstream_20260410-0_arm64.buildinfo

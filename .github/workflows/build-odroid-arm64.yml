@@ -78,6 +78,17 @@ jobs:
         run: |
           sudo apt-get clean
           sudo dpkg --add-architecture arm64
+          # Restrict existing sources to amd64 so apt doesn't try to fetch
+          # arm64 packages from security.ubuntu.com (which doesn't host them)
+          sudo sed -i 's/^deb \[/deb [arch=amd64 /; s/^deb http/deb [arch=amd64] http/' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+          # Add ports.ubuntu.com for arm64 packages
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse" \
+            | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse" \
+            | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports-arm64.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse" \
+            | sudo tee -a /etc/apt/sources.list.d/ubuntu-ports-arm64.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc \

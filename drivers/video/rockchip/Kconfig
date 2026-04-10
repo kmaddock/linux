@@ -14,7 +14,7 @@ config FB_MIRRORING
 	bool     "Mirroring support"
 	depends on FB_ROCKCHIP
 choice
-        bool "Dual display ploy select"
+	prompt "Dual display ploy select"
 	depends on FB_ROCKCHIP
 	default NO_DUAL_DISP
         help

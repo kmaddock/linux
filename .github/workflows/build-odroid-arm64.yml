@@ -101,6 +101,8 @@ jobs:
             gcc-aarch64-linux-gnu \
             kmod \
             libncurses-dev \
+            libc6-dev \
+            libc6-dev:arm64 \
             libelf-dev \
             libssl-dev \
             libssl-dev:arm64 \

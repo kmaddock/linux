@@ -122,7 +122,7 @@ jobs:
         run: |
           make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
           mkdir -p packages
-          mv ../linux-*.deb ../linux-*.buildinfo ../linux-*.changes packages/ 2>/dev/null || true
+          mv linux-*.deb linux-*.buildinfo linux-*.changes packages/ 2>/dev/null || true
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

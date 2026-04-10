@@ -1,0 +1,126 @@
+name: Build ODROID ARM64 Kernel
+
+on:
+  push:
+    paths:
+      - "config-6.1.0-odroid-arm64"
+      - "arch/**"
+      - "block/**"
+      - "certs/**"
+      - "crypto/**"
+      - "Documentation/**"
+      - "drivers/**"
+      - "fs/**"
+      - "include/**"
+      - "init/**"
+      - "io_uring/**"
+      - "ipc/**"
+      - "kernel/**"
+      - "lib/**"
+      - "mm/**"
+      - "net/**"
+      - "rust/**"
+      - "samples/**"
+      - "scripts/**"
+      - "security/**"
+      - "sound/**"
+      - "tools/**"
+      - "usr/**"
+      - "virt/**"
+      - "Makefile"
+      - "Kconfig"
+      - ".github/workflows/build-odroid-arm64.yml"
+  pull_request:
+    paths:
+      - "config-6.1.0-odroid-arm64"
+      - "arch/**"
+      - "block/**"
+      - "certs/**"
+      - "crypto/**"
+      - "Documentation/**"
+      - "drivers/**"
+      - "fs/**"
+      - "include/**"
+      - "init/**"
+      - "io_uring/**"
+      - "ipc/**"
+      - "kernel/**"
+      - "lib/**"
+      - "mm/**"
+      - "net/**"
+      - "rust/**"
+      - "samples/**"
+      - "scripts/**"
+      - "security/**"
+      - "sound/**"
+      - "tools/**"
+      - "usr/**"
+      - "virt/**"
+      - "Makefile"
+      - "Kconfig"
+      - ".github/workflows/build-odroid-arm64.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      ARCH: arm64
+      CROSS_COMPILE: aarch64-linux-gnu-
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            cpio \
+            fakeroot \
+            flex \
+            gcc-aarch64-linux-gnu \
+            kmod \
+            libncurses-dev \
+            libelf-dev \
+            libssl-dev \
+            python3 \
+            rsync \
+            debhelper \
+            dpkg-dev \
+            dwarves
+
+      - name: Prepare config
+        run: |
+          cp config-6.1.0-odroid-arm64 .config
+          make olddefconfig
+
+      - name: Build kernel
+        run: |
+          make -j"$(nproc)"
+
+      - name: Build Debian packages
+        run: |
+          make -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}" deb-pkg
+
+      - name: Upload kernel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: odroid-arm64-kernel-build
+          path: |
+            arch/arm64/boot/Image
+            arch/arm64/boot/Image.gz
+            System.map
+            .config
+
+      - name: Upload Debian package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: odroid-arm64-deb-packages
+          path: |
+            ../linux-*.deb
+            ../linux-*.buildinfo
+            ../linux-*.changes

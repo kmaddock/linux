@@ -78,6 +78,11 @@
 		};
 	};
 
+	rknn: rknn {
+		compatible = "rockchip,rknn";
+		status = "okay";
+	};
+
 	rk809-sound {
 		compatible = "simple-audio-card";
 		pinctrl-names = "default";
@@ -720,6 +725,26 @@
 
 &usb2phy1_otg {
 	phy-supply = <&vcc5v0_usb_host>;
+	status = "okay";
+};
+
+&rga {
+	status = "okay";
+};
+
+&vpu {
+	status = "okay";
+};
+
+&vdpu_mmu {
+	status = "okay";
+};
+
+&vepu {
+	status = "okay";
+};
+
+&vepu_mmu {
 	status = "okay";
 };
 

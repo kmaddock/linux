@@ -62,7 +62,92 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      only_rknpu: ${{ steps.compute.outputs.only_rknpu }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            only_rknpu:
+              - 'drivers/rknpu/**'
+            non_rknpu:
+              - '**'
+              - '!drivers/rknpu/**'
+
+      - name: Compute only_rknpu
+        id: compute
+        run: |
+          if [[ "${{ steps.filter.outputs.only_rknpu }}" == 'true' && "${{ steps.filter.outputs.non_rknpu }}" == 'false' ]]; then
+            echo "only_rknpu=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "only_rknpu=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-rknpu-only:
+    needs: changes
+    if: needs.changes.outputs.only_rknpu == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      ARCH: arm64
+      CROSS_COMPILE: aarch64-linux-gnu-
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc \
+            bison \
+            build-essential \
+            flex \
+            gcc-aarch64-linux-gnu \
+            libncurses-dev \
+            libelf-dev \
+            libssl-dev \
+            python3
+
+      - name: Restore kernel prep cache
+        id: cache-prep
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: ${{ runner.os }}-arm64-rknpu-prep-${{ hashFiles('config-6.1.0-odroid-arm64', 'Kconfig', 'Makefile', 'drivers/Kconfig', 'drivers/Makefile') }}
+
+      - name: Prepare config and headers
+        if: steps.cache-prep.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p out
+          cp config-6.1.0-odroid-arm64 out/.config
+          make O=out olddefconfig
+          make O=out modules_prepare
+
+      - name: Build rknpu module only
+        run: |
+          make O=out -j"$(nproc)" M=drivers/rknpu modules
+
+      - name: Upload rknpu artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: odroid-arm64-rknpu-modules
+          path: |
+            out/drivers/rknpu/*.ko
+            out/.config
+
+  build-full:
+    needs: changes
+    if: needs.changes.outputs.only_rknpu != 'true'
     runs-on: ubuntu-24.04
     env:
       ARCH: arm64
@@ -93,28 +178,36 @@ jobs:
             dpkg-dev \
             dwarves
 
+      - name: Restore kernel prep cache
+        id: cache-prep
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: ${{ runner.os }}-arm64-rknpu-prep-${{ hashFiles('config-6.1.0-odroid-arm64', 'Kconfig', 'Makefile', 'drivers/Kconfig', 'drivers/Makefile') }}
+
       - name: Prepare config
         run: |
-          cp config-6.1.0-odroid-arm64 .config
-          make olddefconfig
+          mkdir -p out
+          cp config-6.1.0-odroid-arm64 out/.config
+          make O=out olddefconfig
 
       - name: Build kernel
         run: |
-          make -j"$(nproc)"
+          make O=out -j"$(nproc)"
 
       - name: Build Debian packages
         run: |
-          make -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}" deb-pkg
+          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}" deb-pkg
 
       - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
           name: odroid-arm64-kernel-build
           path: |
-            arch/arm64/boot/Image
-            arch/arm64/boot/Image.gz
-            System.map
-            .config
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/System.map
+            out/.config
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

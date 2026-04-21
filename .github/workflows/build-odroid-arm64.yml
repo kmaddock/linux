@@ -62,7 +62,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-deb-pkg:
     runs-on: ubuntu-24.04
     env:
       ARCH: arm64
@@ -71,11 +71,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Install build dependencies
         run: |
+          sudo apt-get clean
+          sudo dpkg --add-architecture arm64
+          # Restrict existing sources to amd64 only.
+          # ubuntu-24.04 runners use DEB822 format (.sources); handle both that
+          # and legacy .list format so security.ubuntu.com isn't queried for arm64.
+          sudo sed -i \
+            '/^Architectures:/d; s/^Types: deb$/Types: deb\nArchitectures: amd64/' \
+            /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
+          sudo sed -i \
+            's/^deb \[/deb [arch=amd64 /; s/^deb http/deb [arch=amd64] http/' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+          # Add ports.ubuntu.com as the arm64 package source (DEB822 format)
+          printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports\nSuites: noble noble-updates noble-security\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+            | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.sources
           sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get install -y --no-install-recommends \
             bc \
             bison \
             build-essential \
@@ -85,8 +101,11 @@ jobs:
             gcc-aarch64-linux-gnu \
             kmod \
             libncurses-dev \
+            libc6-dev \
+            libc6-dev:arm64 \
             libelf-dev \
             libssl-dev \
+            libssl-dev:arm64 \
             python3 \
             rsync \
             debhelper \
@@ -95,32 +114,18 @@ jobs:
 
       - name: Prepare config
         run: |
-          cp config-6.1.0-odroid-arm64 .config
-          make olddefconfig
-
-      - name: Build kernel
-        run: |
-          make -j"$(nproc)"
+          mkdir -p out
+          cp config-6.1.0-odroid-arm64 out/.config
+          make O=out olddefconfig
 
       - name: Build Debian packages
         run: |
-          make -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}" deb-pkg
-
-      - name: Upload kernel artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: odroid-arm64-kernel-build
-          path: |
-            arch/arm64/boot/Image
-            arch/arm64/boot/Image.gz
-            System.map
-            .config
+          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
+          mkdir -p packages
+          mv linux-*.deb linux-*.buildinfo linux-*.changes packages/ 2>/dev/null || true
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4
         with:
           name: odroid-arm64-deb-packages
-          path: |
-            ../linux-*.deb
-            ../linux-*.buildinfo
-            ../linux-*.changes
+          path: packages/

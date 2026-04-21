@@ -103,6 +103,7 @@ jobs:
             libncurses-dev \
             libc6-dev \
             libc6-dev:arm64 \
+            libdw-dev \
             libelf-dev \
             libssl-dev \
             libssl-dev:arm64 \

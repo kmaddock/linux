@@ -118,9 +118,9 @@ jobs:
         with:
           path: |
             out
-          key: linux-rk-v6.14-drivers-${{ github.run_id }}
+          key: linux-rk-v6.19-${{ github.run_id }}
           restore-keys: |
-            linux-rk-v6.14-drivers-
+            linux-rk-v6.19-
 
       - name: Prepare config
         run: |
@@ -140,7 +140,7 @@ jobs:
         with:
           path: |
             out
-          key: linux-rk-v6.14-drivers-${{ github.run_id }}
+          key: linux-rk-v6.19-${{ github.run_id }}
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

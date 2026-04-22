@@ -3,7 +3,7 @@ name: Build ODROID ARM64 Kernel
 on:
   push:
     paths:
-      - "config-6.1.0-odroid-arm64"
+      - "config-6.18.0-odroid-arm64"
       - "arch/**"
       - "block/**"
       - "certs/**"
@@ -32,7 +32,7 @@ on:
       - ".github/workflows/build-odroid-arm64.yml"
   pull_request:
     paths:
-      - "config-6.1.0-odroid-arm64"
+      - "config-6.18.0-odroid-arm64"
       - "arch/**"
       - "block/**"
       - "certs/**"
@@ -118,14 +118,14 @@ jobs:
         with:
           path: |
             out
-          key: linux-odroid-arm64-${{ github.run_id }}
+          key: linux-odroid-arm64-v6.19-${{ github.run_id }}
           restore-keys: |
-            linux-odroid-arm64-
+            linux-odroid-arm64-v6.19-
 
       - name: Prepare config
         run: |
           mkdir -p out
-          cp config-6.1.0-odroid-arm64 out/.config
+          cp config-6.18.0-odroid-arm64 out/.config
           make O=out olddefconfig
 
       - name: Build Debian packages
@@ -140,7 +140,7 @@ jobs:
         with:
           path: |
             out
-          key: linux-odroid-arm64-${{ github.run_id }}
+          key: linux-odroid-arm64-v6.19-${{ github.run_id }}
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

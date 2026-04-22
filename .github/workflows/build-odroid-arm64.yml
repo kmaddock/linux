@@ -127,11 +127,11 @@ jobs:
         run: |
           mkdir -p out
           cp config-6.1.0-odroid-arm64 out/.config
-          make O=out olddefconfig
+          make O=out LOCALVERSION=-arm64 olddefconfig
 
       - name: Build Debian packages
         run: |
-          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
+          make O=out LOCALVERSION=-arm64 -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
           mkdir -p packages
           mv linux-*.deb linux-*.buildinfo linux-*.changes packages/ 2>/dev/null || true
 

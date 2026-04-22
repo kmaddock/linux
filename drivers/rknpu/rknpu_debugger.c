@@ -15,7 +15,7 @@
 
 #ifndef FPGA_PLATFORM
 #ifdef CONFIG_PM_DEVFREQ
-#include <../drivers/devfreq/governor.h>
+#include <linux/devfreq-governor.h>
 #endif
 #endif
 

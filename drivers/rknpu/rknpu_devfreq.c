@@ -9,7 +9,7 @@
 #include <linux/devfreq_cooling.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
-#include <../drivers/devfreq/governor.h>
+#include <linux/devfreq-governor.h>
 #include "rknpu_drv.h"
 #include "rknpu_devfreq.h"
 

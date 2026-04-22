@@ -907,6 +907,17 @@ static struct rk_iommu *rk_iommu_from_dev(struct device *dev)
 	return data ? data->iommu : NULL;
 }
 
+bool rockchip_iommu_is_enabled(struct device *dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
+
+	if (!iommu)
+		return false;
+
+	return rk_iommu_is_paging_enabled(iommu);
+}
+EXPORT_SYMBOL(rockchip_iommu_is_enabled);
+
 /* Must be called with iommu powered on and attached */
 static void rk_iommu_disable(struct rk_iommu *iommu)
 {

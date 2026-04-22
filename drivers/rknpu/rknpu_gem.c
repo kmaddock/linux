@@ -14,7 +14,6 @@
 #include <linux/shmem_fs.h>
 #include <linux/dma-buf.h>
 #include <linux/iommu.h>
-#include <linux/pfn_t.h>
 #include <linux/version.h>
 #include <linux/version_compat_defs.h>
 #include <asm/cacheflush.h>
@@ -1286,8 +1285,7 @@ vm_fault_t rknpu_gem_fault(struct vm_fault *vmf)
 	}
 
 	pfn = page_to_pfn(rknpu_obj->pages[page_offset]);
-	return vmf_insert_mixed(vma, vmf->address,
-				__pfn_to_pfn_t(pfn, PFN_DEV));
+	return vmf_insert_mixed(vma, vmf->address, pfn);
 }
 #elif KERNEL_VERSION(4, 14, 0) <= LINUX_VERSION_CODE
 int rknpu_gem_fault(struct vm_fault *vmf)

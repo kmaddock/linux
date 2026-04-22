@@ -34,6 +34,7 @@ enum {
 
 enum {
 	IO_WQ_BIT_EXIT		= 0,	/* wq exiting */
+	IO_WQ_BIT_EXIT_ON_IDLE	= 1,	/* exit on idle */
 };
 
 enum {
@@ -1291,6 +1292,14 @@ static bool io_task_work_match(struct callback_head *cb, void *data)
 void io_wq_exit_start(struct io_wq *wq)
 {
 	set_bit(IO_WQ_BIT_EXIT, &wq->state);
+}
+
+void io_wq_set_exit_on_idle(struct io_wq *wq, bool enable)
+{
+	if (enable)
+		set_bit(IO_WQ_BIT_EXIT_ON_IDLE, &wq->state);
+	else
+		clear_bit(IO_WQ_BIT_EXIT_ON_IDLE, &wq->state);
 }
 
 static void io_wq_cancel_tw_create(struct io_wq *wq)

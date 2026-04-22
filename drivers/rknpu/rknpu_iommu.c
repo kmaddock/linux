@@ -13,10 +13,6 @@
 
 #define RKNPU_SWITCH_DOMAIN_WAIT_TIME_MS 6000
 
-#if KERNEL_VERSION(6, 5, 0) <= LINUX_VERSION_CODE
-#define sg_is_dma_bus_address(sg) sg_dma_is_bus_address(sg)
-#endif
-
 dma_addr_t rknpu_iommu_dma_alloc_iova(struct iommu_domain *domain, size_t size,
 				      u64 dma_limit, struct device *dev,
 				      bool size_aligned)
@@ -31,33 +27,13 @@ dma_addr_t rknpu_iommu_dma_alloc_iova(struct iommu_domain *domain, size_t size,
 	shift = iova_shift(iovad);
 	iova_len = size >> shift;
 
-#if KERNEL_VERSION(6, 1, 0) > LINUX_VERSION_CODE
-	/*
-	 * Freeing non-power-of-two-sized allocations back into the IOVA caches
-	 * will come back to bite us badly, so we have to waste a bit of space
-	 * rounding up anything cacheable to make sure that can't happen. The
-	 * order of the unadjusted size will still match upon freeing.
-	 */
-	if (iova_len < (1 << (IOVA_RANGE_CACHE_MAX_SIZE - 1)))
-		iova_len = roundup_pow_of_two(iova_len);
-#endif
-
-#if (KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE)
 	dma_limit = min_not_zero(dma_limit, dev->bus_dma_limit);
-#else
-	if (dev->bus_dma_mask)
-		dma_limit &= dev->bus_dma_mask;
-#endif
 
 	if (domain->geometry.force_aperture)
 		dma_limit =
 			min_t(u64, dma_limit, domain->geometry.aperture_end);
 
-#if (KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE)
 	limit_pfn = dma_limit >> shift;
-#else
-	limit_pfn = min_t(dma_addr_t, dma_limit >> shift, iovad->end_pfn);
-#endif
 
 	if (alloc_fast) {
 		iova = alloc_iova_fast(iovad, iova_len, limit_pfn, true);
@@ -128,7 +104,7 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
 		sg_dma_len(s) = 0;
 
 #if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
-		if (sg_is_dma_bus_address(s)) {
+		if (sg_dma_is_bus_address(s)) {
 			if (i > 0)
 				cur = sg_next(cur);
 
@@ -184,9 +160,8 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
 	struct scatterlist *s;
 	int i;
 
-#if KERNEL_VERSION(6, 1, 0) <= LINUX_VERSION_CODE
 	for_each_sg(sg, s, nents, i) {
-		if (sg_is_dma_bus_address(s)) {
+		if (sg_dma_is_bus_address(s)) {
 			sg_dma_unmark_bus_address(s);
 		} else {
 			if (sg_dma_address(s) != DMA_MAPPING_ERROR)
@@ -197,16 +172,6 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
 		sg_dma_address(s) = DMA_MAPPING_ERROR;
 		sg_dma_len(s) = 0;
 	}
-#else
-	for_each_sg(sg, s, nents, i) {
-		if (sg_dma_address(s) != DMA_MAPPING_ERROR)
-			s->offset += sg_dma_address(s);
-		if (sg_dma_len(s))
-			s->length = sg_dma_len(s);
-		sg_dma_address(s) = DMA_MAPPING_ERROR;
-		sg_dma_len(s) = 0;
-	}
-#endif
 }
 
 int rknpu_iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
@@ -327,7 +292,7 @@ void rknpu_iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 	 * just have to be determined.
 	 */
 	for_each_sg(sg, tmp, nents, i) {
-		if (sg_is_dma_bus_address(tmp)) {
+		if (sg_dma_is_bus_address(tmp)) {
 			sg_dma_unmark_bus_address(tmp);
 			continue;
 		}
@@ -341,7 +306,7 @@ void rknpu_iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg,
 
 	nents -= i;
 	for_each_sg(tmp, tmp, nents, i) {
-		if (sg_is_dma_bus_address(tmp)) {
+		if (sg_dma_is_bus_address(tmp)) {
 			sg_dma_unmark_bus_address(tmp);
 			continue;
 		}
@@ -428,7 +393,6 @@ int rknpu_iommu_switch_domain(struct rknpu_device *rknpu_dev, int domain_id)
 {
 	struct iommu_domain *src_domain = NULL;
 	struct iommu_domain *dst_domain = NULL;
-	const struct bus_type *bus = NULL;
 	int src_domain_id = 0;
 	int ret = -EINVAL;
 
@@ -442,10 +406,6 @@ int rknpu_iommu_switch_domain(struct rknpu_device *rknpu_dev, int domain_id)
 			domain_id, rknpu_dev->iommu_domain_id);
 		return -EINVAL;
 	}
-
-	bus = rknpu_dev->dev->bus;
-	if (!bus)
-		return -EFAULT;
 
 	src_domain_id = rknpu_dev->iommu_domain_id;
 	if (domain_id == src_domain_id) {
@@ -479,7 +439,7 @@ int rknpu_iommu_switch_domain(struct rknpu_device *rknpu_dev, int domain_id)
 		}
 		rknpu_dev->iommu_domain_id = domain_id;
 	} else {
-		dst_domain = iommu_domain_alloc(bus);
+		dst_domain = iommu_paging_domain_alloc(rknpu_dev->dev);
 		if (!dst_domain) {
 			LOG_DEV_ERROR(rknpu_dev->dev,
 				      "failed to allocate iommu domain\n");
@@ -501,10 +461,6 @@ int rknpu_iommu_switch_domain(struct rknpu_device *rknpu_dev, int domain_id)
 
 		// set domain type to dma domain
 		dst_domain->type |= __IOMMU_DOMAIN_DMA_API;
-		// iommu dma init domain
-#if KERNEL_VERSION(6, 10, 0) > LINUX_VERSION_CODE
-		iommu_setup_dma_ops(rknpu_dev->dev, 0, 1ULL << 32);
-#endif
 
 		rknpu_dev->iommu_domain_id = domain_id;
 		rknpu_dev->iommu_domains[domain_id] = dst_domain;

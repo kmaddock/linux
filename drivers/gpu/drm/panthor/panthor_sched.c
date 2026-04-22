@@ -2784,6 +2784,19 @@ void panthor_sched_report_mmu_fault(struct panthor_device *ptdev)
 		panthor_sched_immediate_tick(ptdev);
 }
 
+/**
+ * panthor_sched_prepare_for_vm_destruction() - Prepare for VM destruction.
+ *
+ * Force a tick to allow the scheduler to handle any groups associated
+ * with the VM being destroyed.
+ */
+void panthor_sched_prepare_for_vm_destruction(struct panthor_device *ptdev)
+{
+	/* Force a tick to clean up groups before the VM is destroyed. */
+	if (ptdev->scheduler)
+		panthor_sched_immediate_tick(ptdev);
+}
+
 void panthor_sched_resume(struct panthor_device *ptdev)
 {
 	/* Force a tick to re-evaluate after a resume. */

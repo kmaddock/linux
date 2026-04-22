@@ -2,3 +2,4 @@
 obj-y += rga/
 obj-y += rkisp1/
 obj-y += rkvdec/
+obj-$(CONFIG_ROCKCHIP_MPP_SERVICE) += mpp/

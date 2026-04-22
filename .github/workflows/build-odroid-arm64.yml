@@ -114,24 +114,23 @@ jobs:
             dwarves
 
       - name: Restore build cache
-        id: cache
         uses: actions/cache/restore@v4
         with:
           path: |
             out
-          key: linux-rk-v6.19-${{ github.run_id }}
+          key: linux-odroid-arm64-${{ github.run_id }}
           restore-keys: |
-            linux-rk-v6.19-
+            linux-odroid-arm64-
 
       - name: Prepare config
         run: |
           mkdir -p out
           cp config-6.1.0-odroid-arm64 out/.config
-          make O=out LOCALVERSION=-arm64 olddefconfig
+          make O=out olddefconfig
 
       - name: Build Debian packages
         run: |
-          make O=out LOCALVERSION=-arm64 -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
+          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
           mkdir -p packages
           mv linux-*.deb linux-*.buildinfo linux-*.changes packages/ 2>/dev/null || true
 
@@ -141,7 +140,7 @@ jobs:
         with:
           path: |
             out
-          key: linux-rk-v6.19-${{ github.run_id }}
+          key: linux-odroid-arm64-${{ github.run_id }}
 
       - name: Upload Debian package artifacts
         uses: actions/upload-artifact@v4

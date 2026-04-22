@@ -1,0 +1,149 @@
+name: Build ODROID ARM64 Kernel
+
+on:
+  push:
+    paths:
+      - "config-6.18.0-odroid-arm64"
+      - "arch/**"
+      - "block/**"
+      - "certs/**"
+      - "crypto/**"
+      - "Documentation/**"
+      - "drivers/**"
+      - "fs/**"
+      - "include/**"
+      - "init/**"
+      - "io_uring/**"
+      - "ipc/**"
+      - "kernel/**"
+      - "lib/**"
+      - "mm/**"
+      - "net/**"
+      - "rust/**"
+      - "samples/**"
+      - "scripts/**"
+      - "security/**"
+      - "sound/**"
+      - "tools/**"
+      - "usr/**"
+      - "virt/**"
+      - "Makefile"
+      - "Kconfig"
+      - ".github/workflows/build-odroid-arm64.yml"
+  pull_request:
+    paths:
+      - "config-6.18.0-odroid-arm64"
+      - "arch/**"
+      - "block/**"
+      - "certs/**"
+      - "crypto/**"
+      - "Documentation/**"
+      - "drivers/**"
+      - "fs/**"
+      - "include/**"
+      - "init/**"
+      - "io_uring/**"
+      - "ipc/**"
+      - "kernel/**"
+      - "lib/**"
+      - "mm/**"
+      - "net/**"
+      - "rust/**"
+      - "samples/**"
+      - "scripts/**"
+      - "security/**"
+      - "sound/**"
+      - "tools/**"
+      - "usr/**"
+      - "virt/**"
+      - "Makefile"
+      - "Kconfig"
+      - ".github/workflows/build-odroid-arm64.yml"
+  workflow_dispatch:
+
+jobs:
+  build-deb-pkg:
+    runs-on: ubuntu-24.04
+    env:
+      ARCH: arm64
+      CROSS_COMPILE: aarch64-linux-gnu-
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get clean
+          sudo dpkg --add-architecture arm64
+          # Restrict existing sources to amd64 only.
+          # ubuntu-24.04 runners use DEB822 format (.sources); handle both that
+          # and legacy .list format so security.ubuntu.com isn't queried for arm64.
+          sudo sed -i \
+            '/^Architectures:/d; s/^Types: deb$/Types: deb\nArchitectures: amd64/' \
+            /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true
+          sudo sed -i \
+            's/^deb \[/deb [arch=amd64 /; s/^deb http/deb [arch=amd64] http/' \
+            /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+          # Add ports.ubuntu.com as the arm64 package source (DEB822 format)
+          printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports\nSuites: noble noble-updates noble-security\nComponents: main restricted universe multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+            | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.sources
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc \
+            bison \
+            build-essential \
+            cpio \
+            fakeroot \
+            flex \
+            gcc-aarch64-linux-gnu \
+            kmod \
+            libncurses-dev \
+            libc6-dev \
+            libc6-dev:arm64 \
+            libdw-dev \
+            libelf-dev \
+            libssl-dev \
+            libssl-dev:arm64 \
+            python3 \
+            rsync \
+            debhelper \
+            dpkg-dev \
+            dwarves
+
+      - name: Restore build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            out
+          key: linux-odroid-arm64-v6.18-${{ github.run_id }}
+          restore-keys: |
+            linux-odroid-arm64-v6.18-
+
+      - name: Prepare config
+        run: |
+          mkdir -p out
+          cp config-6.18.0-odroid-arm64 out/.config
+          make O=out olddefconfig
+
+      - name: Build Debian packages
+        run: |
+          make O=out -j"$(nproc)" KDEB_PKGVERSION="$(date +%Y%m%d)-${GITHUB_RUN_NUMBER:-0}" bindeb-pkg
+          mkdir -p packages
+          mv linux-*.deb linux-*.buildinfo linux-*.changes packages/ 2>/dev/null || true
+
+      - name: Save build cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            out
+          key: linux-odroid-arm64-v6.18-${{ github.run_id }}
+
+      - name: Upload Debian package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: odroid-arm64-deb-packages
+          path: packages/

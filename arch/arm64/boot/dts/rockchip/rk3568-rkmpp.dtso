@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Device tree overlay to enable the Rockchip MPP (Media Process Platform)
+ * video codec framework on rk3568/rk3566 SoCs, and disable the conflicting
+ * V4L2 hantro (vpu/vepu) nodes.
+ *
+ * Apply this overlay to use /dev/mpp_service with the rk_vcodec module
+ * instead of the V4L2 codec drivers. Requires CONFIG_ROCKCHIP_MPP_SERVICE=m
+ * and the rk_vcodec module to be loaded.
+ */
+/dts-v1/;
+/plugin/;
+
+/* Disable V4L2 hantro codec nodes */
+&vpu {
+	status = "disabled";
+};
+
+&vepu {
+	status = "disabled";
+};
+
+/* Enable MPP service framework */
+&mpp_srv {
+	status = "okay";
+};
+
+/* Enable MPP codec and IOMMU nodes */
+&vdpu_mpp {
+	status = "okay";
+};
+
+&vepu_mpp {
+	status = "okay";
+};
+
+&jpegd_mpp {
+	status = "okay";
+};
+
+&jpegd_mmu {
+	status = "okay";
+};
+
+&rkvenc_mpp {
+	status = "okay";
+};
+
+&rkvenc_mmu {
+	status = "okay";
+};
+
+&rkvdec_mpp {
+	status = "okay";
+};
+
+&rkvdec_mmu {
+	status = "okay";
+};
+
+&iep_mpp {
+	status = "okay";
+};
+
+&iep_mmu {
+	status = "okay";
+};

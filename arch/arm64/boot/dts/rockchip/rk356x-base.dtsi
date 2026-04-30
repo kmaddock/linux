@@ -682,7 +682,7 @@
 	};
 
 	jpegd_mmu: iommu@fded0480 {
-		compatible = "rockchip,iommu-v2";
+		compatible = "rockchip,rk3568-iommu";
 		reg = <0x0 0xfded0480 0x0 0x40>;
 		interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
 		clock-names = "aclk", "iface";
@@ -712,7 +712,7 @@
 	};
 
 	rkvenc_mmu: iommu@fdf40f00 {
-		compatible = "rockchip,iommu-v2";
+		compatible = "rockchip,rk3568-iommu";
 		reg = <0x0 0xfdf40f00 0x0 0x40>,
 		      <0x0 0xfdf40f40 0x0 0x40>;
 		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
@@ -739,9 +739,11 @@
 			      "clk_core", "clk_hevc_cabac";
 		resets = <&cru SRST_A_RKVDEC>, <&cru SRST_H_RKVDEC>,
 			 <&cru SRST_RKVDEC_CA>, <&cru SRST_RKVDEC_CORE>,
-			 <&cru SRST_RKVDEC_HEVC_CA>;
+			 <&cru SRST_RKVDEC_HEVC_CA>,
+			 <&cru SRST_A_RKVDEC_NIU>, <&cru SRST_H_RKVDEC_NIU>;
 		reset-names = "video_a", "video_h", "video_cabac",
-			      "video_core", "video_hevc_cabac";
+			      "video_core", "video_hevc_cabac",
+			      "shared_niu_a", "shared_niu_h";
 		power-domains = <&power RK3568_PD_RKVDEC>;
 		iommus = <&rkvdec_mmu>;
 		rockchip,srv = <&mpp_srv>;
@@ -753,7 +755,7 @@
 	};
 
 	rkvdec_mmu: iommu@fdf80800 {
-		compatible = "rockchip,iommu-v2";
+		compatible = "rockchip,rk3568-iommu";
 		reg = <0x0 0xfdf80800 0x0 0x40>,
 		      <0x0 0xfdf80840 0x0 0x40>;
 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
@@ -783,7 +785,7 @@
 	};
 
 	iep_mmu: iommu@fdef0800 {
-		compatible = "rockchip,iommu-v2";
+		compatible = "rockchip,rk3568-iommu";
 		reg = <0x0 0xfdef0800 0x0 0x100>;
 		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
 		clock-names = "aclk", "iface";

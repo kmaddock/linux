@@ -67,6 +67,7 @@ jobs:
     env:
       ARCH: arm64
       CROSS_COMPILE: aarch64-linux-gnu-
+      LOCALVERSION: ""
 
     steps:
       - name: Checkout
